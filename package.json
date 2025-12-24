@@ -1,0 +1,17 @@
+{
+  "name": "goldilocks-docs",
+  "version": "1.0.0",
+  "description": "Goldilocks AI Developer Documentation",
+  "scripts": {
+    "dev": "mint dev",
+    "build": "mint build",
+    "validate": "mint openapi-check openapi.yaml"
+  },
+  "devDependencies": {
+    "mint": "^4.2.108"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+

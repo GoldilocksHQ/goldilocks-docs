@@ -1,0 +1,652 @@
+---
+title: Profile Schema
+description: Complete schema documentation for profile objects returned by the Goldilocks AI API
+---
+
+# Profile Schema
+
+A profile object represents a professional person with their complete information including personal details, contact information, work experience, education, and relevancy assessment.
+
+## Overview
+
+Profiles are returned in API responses from search endpoints (`GET /searches/{search_id}/profiles`) and enrichment endpoints (`POST /enrichment/profiles`). Each profile contains four main sections:
+
+- **`profile_data`**: Personal information, location, and professional summary
+- **`contact_data`**: Email addresses and phone numbers
+- **`resume_data`**: Work experience, education, certifications, and enrichment data
+- **`profile_relevancy`**: Relevancy score and assessment (only in search results)
+
+## Profile Structure
+
+```json
+{
+  "position": 1,
+  "profile_data": { ... },
+  "contact_data": { ... },
+  "resume_data": { ... },
+  "profile_relevancy": { ... }
+}
+```
+
+### Top-Level Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `position` | `integer` | Position in the results array (1-based) |
+| `profile_data` | `object` | Personal and professional information |
+| `contact_data` | `object` | Contact information (emails and phones) |
+| `resume_data` | `object` | Work experience, education, and enrichment data |
+| `profile_relevancy` | `object` | Relevancy assessment (only in search results) |
+
+---
+
+## Profile Data
+
+The `profile_data` section contains personal information, location, and professional summary.
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `people_id` | `string` (UUID) | Unique profile identifier |
+| `raw_location` | `string \| null` | Raw location string (e.g., "San Francisco, CA") |
+| `profile_address` | `object \| null` | Structured address information |
+| `profile_picture` | `object \| null` | Profile picture URL |
+| `profile_first_name` | `string \| null` | First name |
+| `profile_last_name` | `string \| null` | Last name |
+| `profile_full_name` | `string \| null` | Full name |
+| `profile_summary` | `string \| null` | Professional summary |
+| `profile_headline` | `string \| null` | Current headline (e.g., "Senior Software Engineer at Tech Company") |
+| `profile_expertises` | `array<string>` | Array of expertise areas |
+| `profile_languages` | `array<string>` | Array of languages |
+| `profile_social_links` | `array<object>` | Array of social media links |
+| `profile_last_modified_date` | `string \| null` | ISO 8601 date-time of last modification |
+
+### Profile Address
+
+```json
+{
+  "country": "United States",
+  "state": "California",
+  "city": "San Francisco",
+  "county": "San Francisco County",
+  "continent": "North America",
+  "country_code": "US"
+}
+```
+
+### Profile Picture
+
+```json
+{
+  "url": "https://example.com/profile.jpg"
+}
+```
+
+### Social Link
+
+```json
+{
+  "name": "linkedin",
+  "url": "https://linkedin.com/in/johndoe"
+}
+```
+
+---
+
+## Contact Data
+
+The `contact_data` section contains email addresses and phone numbers.
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `contact_tags` | `array<string>` | Contact tags indicating available contact types. Possible values: `"Contact Has Email"`, `"Contact Has Phone"` |
+| `contact_emails` | `array<object>` | Array of email addresses. **Note**: Only populated when profiles are enriched via the `POST /enrichment/profiles` endpoint with `email` enrichment type, or when profiles already have email data from previous enrichment requests. |
+| `contact_phones` | `array<object>` | Array of phone numbers. **Note**: Only populated when profiles are enriched via the `POST /enrichment/profiles` endpoint with `phone` enrichment type, or when profiles already have phone data from previous enrichment requests. |
+
+### Contact Email
+
+```json
+{
+  "email": "john.doe@example.com"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `email` | `string` | Email address (format: email) |
+
+### Contact Phone
+
+```json
+{
+  "phone": "+1-415-555-0123",
+  "ddi": false,
+  "dnc": false
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `phone` | `string` | Phone number |
+| `ddi` | `boolean \| null` | Direct dial indicator |
+| `dnc` | `boolean \| null` | Do not call indicator |
+
+---
+
+## Resume Data
+
+The `resume_data` section contains work experience, education, certifications, and enrichment data (awards, publications, memberships, patents).
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `experiences` | `array<object>` | Work experience entries |
+| `educations` | `array<object>` | Education entries |
+| `certifications` | `array<object>` | Certification entries |
+| `awards` | `array<object>` | Professional awards. **Note**: Only populated when profiles are enriched via the `POST /enrichment/profiles` endpoint with `award` enrichment type, or when profiles already have award data from previous enrichment requests. |
+| `memberships` | `array<object>` | Professional memberships. **Note**: Only populated when profiles are enriched via the `POST /enrichment/profiles` endpoint with `membership` enrichment type, or when profiles already have membership data from previous enrichment requests. |
+| `publications` | `array<object>` | Publications. **Note**: Only populated when profiles are enriched via the `POST /enrichment/profiles` endpoint with `publication` enrichment type, or when profiles already have publication data from previous enrichment requests. |
+| `patents` | `array<object>` | Patents. **Note**: Only populated when profiles are enriched via the `POST /enrichment/profiles` endpoint with `patent` enrichment type, or when profiles already have patent data from previous enrichment requests. |
+| `resume_tags` | `array<string>` | Resume tags indicating available enrichment data. Possible values: `"Resume Has Membership"`, `"Resume Has Publication"`, `"Resume Has Patent"`, `"Resume Has Award"` |
+
+### Experience
+
+```json
+{
+  "current": true,
+  "summary": "Led backend development team",
+  "end_date": "2024-12-31",
+  "priority": 1,
+  "job_title": "Senior Software Engineer",
+  "start_date": "2020-01-01",
+  "raw_location": "San Francisco, CA",
+  "job_functions": [
+    {
+      "level1": {
+        "name": "Engineering"
+      }
+    }
+  ],
+  "job_seniority": {
+    "job_level": "senior"
+  },
+  "job_title_details": {
+    "normalized_job_title": {
+      "id": 12345,
+      "job_title": "Senior Software Engineer"
+    }
+  },
+  "organisation": { ... }
+}
+```
+
+### Organisation
+
+```json
+{
+  "name": "Tech Innovations Inc",
+  "domain": "techinnovations.com",
+  "logo_url": "https://example.com/logo.png",
+  "industry": "Technology",
+  "phones": [
+    {
+      "phone": "+1-415-555-0000",
+      "ddi": false,
+      "dnc": false
+    }
+  ],
+  "employees": {
+    "number_of_employees_code": "501-1000"
+  },
+  "industries": [
+    {
+      "name2": "Software",
+      "name3": "Enterprise Software",
+      "name4": "SaaS",
+      "name5": null,
+      "name6": null,
+      "activity_priority": 1,
+      "priority": 1
+    }
+  ],
+  "web_addresses": [
+    {
+      "url": "https://techinnovations.com"
+    }
+  ],
+  "social_links": [
+    {
+      "name": "linkedin",
+      "url": "https://linkedin.com/company/techinnovations"
+    }
+  ]
+}
+```
+
+### Education
+
+```json
+{
+  "diploma": "Bachelor of Science",
+  "end_date": "2015-05-31",
+  "priority": 1,
+  "start_date": "2011-09-01",
+  "specialization": "Computer Science",
+  "educational_establishment": "Stanford University",
+  "educational_establishment_web_address": {
+    "url": "https://stanford.edu"
+  }
+}
+```
+
+### Certification
+
+```json
+{
+  "name": "AWS Certified Solutions Architect",
+  "description": "Professional certification for AWS cloud architecture",
+  "authority": "Amazon Web Services",
+  "reference": "AWS-CSA-12345",
+  "web_address": {
+    "url": "https://aws.amazon.com/certification"
+  },
+  "date": "2023-06-15",
+  "start_date": "2023-06-01",
+  "end_date": "2026-06-01",
+  "priority": 1
+}
+```
+
+---
+
+## Enrichment Data
+
+The following enrichment data types are available in the `resume_data` section. These fields are only populated when you request enrichment via the `POST /enrichment/profiles` endpoint or when profiles already have enrichment data from previous requests.
+
+### Award
+
+Awards are located in `resume_data.awards`:
+
+```json
+{
+  "name": "Employee of the Year",
+  "description": "Recognized for outstanding performance",
+  "issue": "Tech Corp",
+  "date": "2023-12-01"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `string` | Award name |
+| `description` | `string` | Award description |
+| `issue` | `string` | Award issuer |
+| `date` | `string` | Award date (YYYY-MM-DD) |
+
+### Publication
+
+Publications are located in `resume_data.publications`:
+
+```json
+{
+  "name": "Machine Learning in Practice",
+  "description": "A comprehensive guide to ML applications",
+  "reference": "ISBN: 978-0-123456-78-9",
+  "issue": "Volume 5, Issue 2",
+  "web_address": {
+    "url": "https://example.com/publication"
+  },
+  "date": "2023-06-15"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `string` | Publication name |
+| `description` | `string` | Publication description |
+| `reference` | `string` | Publication reference (e.g., ISBN) |
+| `issue` | `string` | Publication issue |
+| `web_address` | `object` | Web address object with `url` field |
+| `date` | `string` | Publication date (YYYY-MM-DD) |
+
+### Membership
+
+Memberships are located in `resume_data.memberships`:
+
+```json
+{
+  "title": "Board Member",
+  "description": "Served on the board of directors",
+  "reference": "Member ID: 12345",
+  "web_address": {
+    "url": "https://example.com/organization"
+  },
+  "name": "Tech Industry Association",
+  "start_date": "2020-01-01",
+  "end_date": "2024-12-31",
+  "location": "San Francisco, CA"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | `string` | Membership title |
+| `description` | `string` | Membership description |
+| `reference` | `string` | Membership reference |
+| `web_address` | `object` | Web address object with `url` field |
+| `name` | `string` | Organization name |
+| `start_date` | `string` | Membership start date (YYYY-MM-DD) |
+| `end_date` | `string \| null` | Membership end date (YYYY-MM-DD), null if current |
+| `location` | `string` | Membership location |
+
+### Patent
+
+Patents are located in `resume_data.patents`:
+
+```json
+{
+  "name": "Advanced Machine Learning Algorithm",
+  "issue": "US Patent Office",
+  "number": "US123456789",
+  "web_address": {
+    "url": "https://patents.google.com/patent/US123456789"
+  },
+  "date": "2023-03-15",
+  "start_date": "2023-01-01",
+  "end_date": "2043-01-01",
+  "priority": 1
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `string` | Patent name |
+| `issue` | `string` | Patent issue authority |
+| `number` | `string` | Patent number |
+| `web_address` | `object` | Web address object with `url` field |
+| `date` | `string` | Patent date (YYYY-MM-DD) |
+| `start_date` | `string` | Patent start date (YYYY-MM-DD) |
+| `end_date` | `string` | Patent end date (YYYY-MM-DD) |
+| `priority` | `integer` | Priority ranking (lower is higher priority) |
+
+### Email (Contact Data)
+
+Email addresses are located in `contact_data.contact_emails`:
+
+```json
+{
+  "email": "john.doe@example.com"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `email` | `string` | Email address (format: email) |
+
+### Phone (Contact Data)
+
+Phone numbers are located in `contact_data.contact_phones`:
+
+```json
+{
+  "phone": "+1-415-555-0123",
+  "ddi": false,
+  "dnc": false
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `phone` | `string` | Phone number |
+| `ddi` | `boolean \| null` | Direct dial indicator |
+| `dnc` | `boolean \| null` | Do not call indicator |
+
+---
+
+## Profile Relevancy
+
+The `profile_relevancy` section is only present in search results (not in enrichment responses). It contains the relevancy assessment for how well the profile matches your search criteria.
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `relevancy_score` | `integer` | Relevancy score from 0-100 (higher is more relevant) |
+| `relevancy_summary` | `string` | Summary explanation of why this profile is relevant |
+| `filter_checks` | `array<object>` | Array of filter check results |
+
+### Filter Check
+
+```json
+{
+  "filter_name": "linkedin_profile",
+  "level_of_match": 1.0,
+  "reasoning": "Profile contains the exact LinkedIn URL",
+  "filter_value": "investment bank",
+  "operator": "include"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `filter_name` | `string` | Name of the filter that was checked |
+| `level_of_match` | `number` | Match level from 0.0 to 1.0 (1.0 = exact match) |
+| `reasoning` | `string` | Explanation of the match result |
+| `filter_value` | `string` | The actual value from the profile that corresponds to this filter (condensed, max 50 characters) |
+| `operator` | `string` | Filter operator: `"include"` or `"exclude"` |
+
+---
+
+## Complete Example
+
+```json
+{
+  "position": 1,
+  "profile_data": {
+    "people_id": "123e4567-e89b-12d3-a456-426614174000",
+    "raw_location": "San Francisco, CA",
+    "profile_address": {
+      "country": "United States",
+      "state": "California",
+      "city": "San Francisco",
+      "county": "San Francisco County",
+      "continent": "North America",
+      "country_code": "US"
+    },
+    "profile_picture": {
+      "url": "https://example.com/profile.jpg"
+    },
+    "profile_first_name": "John",
+    "profile_last_name": "Doe",
+    "profile_full_name": "John Doe",
+    "profile_summary": "Experienced software engineer with 10+ years in backend development",
+    "profile_headline": "Senior Software Engineer at Tech Company",
+    "profile_expertises": ["Python", "Machine Learning", "Backend Architecture"],
+    "profile_languages": ["English", "Spanish"],
+    "profile_social_links": [
+      {
+        "name": "linkedin",
+        "url": "https://linkedin.com/in/johndoe"
+      }
+    ],
+    "profile_last_modified_date": "2025-01-15T10:30:00Z"
+  },
+  "contact_data": {
+    "contact_tags": ["Contact Has Email", "Contact Has Phone"],
+    "contact_emails": [
+      {
+        "email": "john.doe@example.com"
+      }
+    ],
+    "contact_phones": [
+      {
+        "phone": "+1-415-555-0123",
+        "ddi": false,
+        "dnc": false
+      }
+    ]
+  },
+  "resume_data": {
+    "experiences": [
+      {
+        "current": true,
+        "summary": "Led backend development team",
+        "end_date": null,
+        "priority": 1,
+        "job_title": "Senior Software Engineer",
+        "start_date": "2020-01-01",
+        "raw_location": "San Francisco, CA",
+        "job_functions": [
+          {
+            "level1": {
+              "name": "Engineering"
+            }
+          }
+        ],
+        "job_seniority": {
+          "job_level": "senior"
+        },
+        "job_title_details": {
+          "normalized_job_title": {
+            "id": 12345,
+            "job_title": "Senior Software Engineer"
+          }
+        },
+        "organisation": {
+          "name": "Tech Innovations Inc",
+          "domain": "techinnovations.com",
+          "logo_url": "https://example.com/logo.png",
+          "industry": "Technology",
+          "phones": [
+            {
+              "phone": "+1-415-555-0000",
+              "ddi": false,
+              "dnc": false
+            }
+          ],
+          "employees": {
+            "number_of_employees_code": "501-1000"
+          },
+          "industries": [
+            {
+              "name2": "Software",
+              "name3": "Enterprise Software",
+              "name4": "SaaS",
+              "name5": null,
+              "name6": null,
+              "activity_priority": 1,
+              "priority": 1
+            }
+          ],
+          "web_addresses": [
+            {
+              "url": "https://techinnovations.com"
+            }
+          ],
+          "social_links": [
+            {
+              "name": "linkedin",
+              "url": "https://linkedin.com/company/techinnovations"
+            }
+          ]
+        }
+      }
+    ],
+    "educations": [
+      {
+        "diploma": "Bachelor of Science",
+        "end_date": "2015-05-31",
+        "priority": 1,
+        "start_date": "2011-09-01",
+        "specialization": "Computer Science",
+        "educational_establishment": "Stanford University",
+        "educational_establishment_web_address": {
+          "url": "https://stanford.edu"
+        }
+      }
+    ],
+    "certifications": [
+      {
+        "name": "AWS Certified Solutions Architect",
+        "description": "Professional certification for AWS cloud architecture",
+        "authority": "Amazon Web Services",
+        "reference": "AWS-CSA-12345",
+        "web_address": {
+          "url": "https://aws.amazon.com/certification"
+        },
+        "date": "2023-06-15",
+        "start_date": "2023-06-01",
+        "end_date": "2026-06-01",
+        "priority": 1
+      }
+    ],
+    "awards": [
+      {
+        "name": "Employee of the Year",
+        "description": "Recognized for outstanding performance",
+        "issue": "Tech Corp",
+        "date": "2023-12-01"
+      }
+    ],
+    "memberships": [
+      {
+        "title": "Board Member",
+        "description": "Served on the board of directors",
+        "reference": "Member ID: 12345",
+        "web_address": {
+          "url": "https://example.com/organization"
+        },
+        "name": "Tech Industry Association",
+        "start_date": "2020-01-01",
+        "end_date": "2024-12-31",
+        "location": "San Francisco, CA"
+      }
+    ],
+    "publications": [
+      {
+        "name": "Machine Learning in Practice",
+        "description": "A comprehensive guide to ML applications",
+        "reference": "ISBN: 978-0-123456-78-9",
+        "issue": "Volume 5, Issue 2",
+        "web_address": {
+          "url": "https://example.com/publication"
+        },
+        "date": "2023-06-15"
+      }
+    ],
+    "patents": [
+      {
+        "name": "Advanced Machine Learning Algorithm",
+        "issue": "US Patent Office",
+        "number": "US123456789",
+        "web_address": {
+          "url": "https://patents.google.com/patent/US123456789"
+        },
+        "date": "2023-03-15",
+        "start_date": "2023-01-01",
+        "end_date": "2043-01-01",
+        "priority": 1
+      }
+    ],
+    "resume_tags": ["Resume Has Membership", "Resume Has Publication", "Resume Has Patent", "Resume Has Award"]
+  },
+  "profile_relevancy": {
+    "relevancy_score": 85,
+    "relevancy_summary": "Strong match with 8+ years Python experience and San Francisco location",
+    "filter_checks": [
+      {
+        "filter_name": "linkedin_profile",
+        "level_of_match": 1.0,
+        "reasoning": "Profile contains the exact LinkedIn URL",
+        "filter_value": "investment bank",
+        "operator": "include"
+      }
+    ]
+  }
+}
+```
+

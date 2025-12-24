@@ -1,33 +1,64 @@
 ---
 title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+description: 'Get started with the Goldilocks AI Developer API'
 ---
-
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
 
 ## Welcome
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+The Goldilocks AI Developer API enables you to search for professional profiles using natural language queries and enrich them with contact information and professional achievements.
 
 <Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
+  title="Quickstart"
+  icon="rocket"
+  href="/api-reference/quickstart"
 >
-  View the OpenAPI specification file
+  Get started with authentication and your first API call
 </Card>
 
-## Authentication
+## What You Can Do
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+<CardGroup cols={2}>
+  <Card
+    title="Natural Language Search"
+    icon="magnifying-glass"
+    href="/api-reference/searches"
+  >
+    Execute searches using plain English queries to find professional profiles
+  </Card>
+  <Card
+    title="Profile Enrichment"
+    icon="user-plus"
+    href="/api-reference/enrichment"
+  >
+    Add contact information and professional achievements to profiles
+  </Card>
+  <Card
+    title="Query Execution Tracking"
+    icon="signal"
+    href="/api-reference/jobs"
+  >
+    Track query execution progress in real-time using the Jobs API
+  </Card>
+  <Card
+    title="Profile Data Schema"
+    icon="file-code"
+    href="/api-reference/schema/profile"
+  >
+    View the complete profile data schema and field descriptions
+  </Card>
+</CardGroup>
 
-```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
+## Base URL
+
+All API requests should be made to:
+
 ```
+https://api.goldilocksai.app
+```
+
+## Next Steps
+
+1. **[Get your API key](/api-reference/quickstart)** - Set up authentication
+2. **[Execute a search](/api-reference/searches)** - Find professional profiles
+3. **[Monitor jobs](/api-reference/jobs)** - Track long-running operations get search id
+4. **[See profiles](/api-reference/searches/profiles)** - Retrieve matched profiles with detailed insights

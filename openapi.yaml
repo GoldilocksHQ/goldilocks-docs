@@ -1,0 +1,1849 @@
+openapi: 3.1.0
+
+info:
+  title: Goldilocks AI Developer API
+  version: 2.3.0
+  description: |
+    Natural language-powered professional profile search and enrichment API.
+    
+    ## Features
+    - **Natural language searches**: Execute searches using plain English
+    - **Real-time progress updates**: Stream job progress via Server-Sent Events
+    - **Profile enrichment**: Add contact info (email, phone) and professional achievements (awards, publications, memberships, patents)
+    
+    ## Authentication
+    All endpoints require API key authentication using the `X-API-Key` header.
+    
+    To obtain an API key:
+    1. Log in to the Goldilocks web application
+    2. Navigate to API Keys section
+    3. Create a new API key with required scopes
+    4. Copy the key (shown only once)
+    
+    ## Rate Limiting
+    - **Searches API**: 10 requests/minute, 3 concurrent requests maximum
+    - **Enrichment API**: 20 requests/minute
+    - Rate limit headers are included in all responses
+    
+  contact:
+    name: Goldilocks AI Support
+    email: chris@goldilocksai.co.uk
+    url: https://www.goldilocksai.co.uk/contact
+  license:
+    name: Proprietary
+    url: https://www.goldilocksai.co.uk/terms-and-conditions
+
+servers:
+  - url: https://api.goldilocksai.app
+    description: Goldilocks AI API
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: Searches
+    description: |
+      Natural language search operations for finding professional profiles.
+      
+      Use these endpoints to execute searches, retrieve results, and fetch additional profiles.
+      All search operations support real-time progress tracking via Server-Sent Events (SSE).
+  
+  - name: Enrichment
+    description: |
+      Profile enrichment operations for adding contact information and professional achievements.
+      
+      **Supported enrichment types**: email, phone, award, publication, membership, patent
+      
+      **Note**: Only one enrichment type per request. Use separate requests for multiple types.
+  
+  - name: Jobs
+    description: |
+      Job status tracking and real-time progress streaming via Server-Sent Events (SSE).
+      
+      Monitor long-running operations like searches and enrichments in real-time.
+      Each job is identified by a unique `job_id` returned from the initiating operation.
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        API key for authentication. Obtain your API key via the web application.
+
+  schemas:
+    # =====================================================================
+    # COMMON TYPES
+    # =====================================================================
+    
+    UUID:
+      type: string
+      format: uuid
+      description: UUID v4 identifier
+      example: "550e8400-e29b-41d4-a716-446655440000"
+    
+    Timestamp:
+      type: string
+      format: date-time
+      description: ISO 8601 timestamp in UTC
+      example: "2025-12-23T10:30:00.000Z"
+    
+    EnrichmentType:
+      type: string
+      enum:
+        - email
+        - phone
+        - award
+        - publication
+        - membership
+        - patent
+      description: Type of enrichment data to retrieve
+
+    JobStatus:
+      type: string
+      enum:
+        - IN_PROGRESS
+        - COMPLETED
+        - ERROR
+      description: Job execution status
+    
+    # =====================================================================
+    # REQUEST SCHEMAS
+    # =====================================================================
+    
+    QueryRequestV1:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          minLength: 1
+          description: Natural language search query
+          example: "Find partnership managers at Google in UK"
+      description: Request body for executing a search query
+    
+    EnrichmentRequest:
+      type: object
+      required:
+        - people_ids
+        - enrichment_type
+      properties:
+        people_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+          maxItems: 50
+          description: List of people IDs to enrich (max 50 per request)
+          example:
+            - "123e4567-e89b-12d3-a456-426614174000"
+            - "123e4567-e89b-12d3-a456-426614174001"
+        enrichment_type:
+          $ref: '#/components/schemas/EnrichmentType'
+      description: Request body for enriching profiles
+    
+    MoreProfilesRequest:
+      type: object
+      required:
+        - profiles_requested
+      properties:
+        profiles_requested:
+          type: integer
+          minimum: 1
+          maximum: 200
+          description: Number of additional profiles to fetch (1-200)
+          example: 20
+      description: Request body for fetching more profiles for an existing search
+    
+    # =====================================================================
+    # RESPONSE DATA SCHEMAS
+    # =====================================================================
+    
+    SearchQueryResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          description: Job ID for tracking search progress via SSE
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        query:
+          type: string
+          description: The original query text
+          example: "Find partnership managers at Google in UK"
+        user_id:
+          type: string
+          format: uuid
+          description: User ID who initiated the request
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        api_key_id:
+          type: ["string", "null"]
+          format: uuid
+          description: API key ID used for authentication (null if not applicable)
+          example: "789e4567-e89b-12d3-a456-426614174000"
+      description: Response data for POST /searches/query
+    
+    ProfileData:
+      type: object
+      additionalProperties: true
+      description: |
+        Dynamic profile object with assembled data.
+        
+        **Core fields** (always present):
+        - `people_id` (string, UUID): Profile identifier
+        - `full_name` (string): Person's full name
+        - `headline` (string): Professional headline
+        - `current_company` (string): Current employer
+        - `current_position` (string): Current job title
+        - `location` (string): Geographic location
+        
+        **Relevancy fields** (search context only):
+        - `relevancy_score` (integer, 0-100): Relevancy to search query
+        - `relevancy_summary` (string): Why this profile matches
+        
+        **Enrichment fields** (when requested):
+        - `email` (array): Email addresses with priority
+        - `phone` (array): Phone numbers with type and priority
+        - `award` (array): Professional awards
+        - `publication` (array): Publications
+        - `membership` (array): Professional memberships
+        - `patent` (array): Patents
+        
+        **Note**: Only relevant profile fields are included in API responses.
+      example:
+        people_id: "123e4567-e89b-12d3-a456-426614174000"
+        full_name: "John Doe"
+        headline: "Senior Software Engineer at Tech Corp"
+        current_company: "Tech Corp"
+        current_position: "Senior Software Engineer"
+        location: "San Francisco, CA"
+        relevancy_score: 85
+        relevancy_summary: "Strong Python experience with 7 years in San Francisco"
+    
+    SearchProfilesResponse:
+      type: object
+      properties:
+        summarised_query:
+          type: ["string", "null"]
+          description: Summarised version of the search query
+          example: "Find partnership managers at Google in UK"
+        profiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProfileData'
+          description: |
+            Array of assembled profile objects with relevancy scores. See the [Profile Schema](/api-reference/schema/profile) documentation for complete field descriptions and structure.
+      description: Response data for GET /searches/{search_id}/profiles
+    
+    EnrichmentProfileData:
+      oneOf:
+        - title: Email
+          $ref: '#/components/schemas/EnrichmentProfileDataEmail'
+        - title: Phone
+          $ref: '#/components/schemas/EnrichmentProfileDataPhone'
+        - title: Award
+          $ref: '#/components/schemas/EnrichmentProfileDataAward'
+        - title: Publication
+          $ref: '#/components/schemas/EnrichmentProfileDataPublication'
+        - title: Membership
+          $ref: '#/components/schemas/EnrichmentProfileDataMembership'
+        - title: Patent
+          $ref: '#/components/schemas/EnrichmentProfileDataPatent'
+      description: Profile with enrichment data. Structure depends on the enrichment_type requested. Only one enrichment type is returned per request.
+    
+    EnrichmentProfileDataEmail:
+      type: object
+      properties:
+        people_id:
+          type: string
+          format: uuid
+          description: Profile identifier
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        contact_data:
+          type: object
+          properties:
+            contact_emails:
+              type: array
+              items:
+                type: object
+                properties:
+                  email:
+                    type: string
+                    format: email
+                    description: Email address
+                    example: "john.doe@example.com"
+              description: Email addresses
+      description: Profile enriched with email data
+    
+    EnrichmentProfileDataPhone:
+      type: object
+      properties:
+        people_id:
+          type: string
+          format: uuid
+          description: Profile identifier
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        contact_data:
+          type: object
+          properties:
+            contact_phones:
+              type: array
+              items:
+                type: object
+                properties:
+                  phone:
+                    type: string
+                    description: Phone number
+                    example: "+1-415-555-0123"
+                  ddi:
+                    type: ["boolean", "null"]
+                    description: Direct dial indicator
+                    example: false
+                  dnc:
+                    type: ["boolean", "null"]
+                    description: Do not call indicator
+                    example: false
+              description: Phone numbers
+      description: Profile enriched with phone data
+    
+    EnrichmentProfileDataAward:
+      type: object
+      properties:
+        people_id:
+          type: string
+          format: uuid
+          description: Profile identifier
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        resume_data:
+          type: object
+          properties:
+            awards:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: Award name
+                    example: "Employee of the Year"
+                  description:
+                    type: string
+                    description: Award description
+                    example: "Recognized for outstanding performance"
+                  issue:
+                    type: string
+                    description: Award issuer
+                    example: "Tech Corp"
+                  date:
+                    type: string
+                    format: date
+                    description: Award date (YYYY-MM-DD)
+                    example: "2023-12-01"
+              description: Professional awards
+      description: Profile enriched with award data
+    
+    EnrichmentProfileDataPublication:
+      type: object
+      properties:
+        people_id:
+          type: string
+          format: uuid
+          description: Profile identifier
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        resume_data:
+          type: object
+          properties:
+            publications:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: Publication name
+                    example: "Machine Learning in Practice"
+                  description:
+                    type: string
+                    description: Publication description
+                    example: "A comprehensive guide to ML applications"
+                  reference:
+                    type: string
+                    description: Publication reference
+                    example: "ISBN: 978-0-123456-78-9"
+                  issue:
+                    type: string
+                    description: Publication issue
+                    example: "Volume 5, Issue 2"
+                  web_address:
+                    type: object
+                    properties:
+                      url:
+                        type: string
+                        format: uri
+                        description: Web URL
+                        example: "https://example.com/publication"
+                  date:
+                    type: string
+                    format: date
+                    description: Publication date (YYYY-MM-DD)
+                    example: "2023-06-15"
+              description: Publications
+      description: Profile enriched with publication data
+    
+    EnrichmentProfileDataMembership:
+      type: object
+      properties:
+        people_id:
+          type: string
+          format: uuid
+          description: Profile identifier
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        resume_data:
+          type: object
+          properties:
+            memberships:
+              type: array
+              items:
+                type: object
+                properties:
+                  title:
+                    type: string
+                    description: Membership title
+                    example: "Board Member"
+                  description:
+                    type: string
+                    description: Membership description
+                    example: "Served on the board of directors"
+                  reference:
+                    type: string
+                    description: Membership reference
+                    example: "Member ID: 12345"
+                  web_address:
+                    type: object
+                    properties:
+                      url:
+                        type: string
+                        format: uri
+                        description: Web URL
+                        example: "https://example.com/organization"
+                  name:
+                    type: string
+                    description: Organization name
+                    example: "Tech Industry Association"
+                  start_date:
+                    type: string
+                    format: date
+                    description: Membership start date (YYYY-MM-DD)
+                    example: "2020-01-01"
+                  end_date:
+                    type: ["string", "null"]
+                    format: date
+                    description: Membership end date (YYYY-MM-DD), null if current
+                    example: "2024-12-31"
+                  location:
+                    type: string
+                    description: Membership location
+                    example: "San Francisco, CA"
+              description: Professional memberships
+      description: Profile enriched with membership data
+    
+    EnrichmentProfileDataPatent:
+      type: object
+      properties:
+        people_id:
+          type: string
+          format: uuid
+          description: Profile identifier
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        resume_data:
+          type: object
+          properties:
+            patents:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: Patent name
+                    example: "Advanced Machine Learning Algorithm"
+                  issue:
+                    type: string
+                    description: Patent issue
+                    example: "US Patent Office"
+                  number:
+                    type: string
+                    description: Patent number
+                    example: "US123456789"
+                  web_address:
+                    type: object
+                    properties:
+                      url:
+                        type: string
+                        format: uri
+                        description: Web URL
+                        example: "https://patents.google.com/patent/US123456789"
+                  date:
+                    type: string
+                    format: date
+                    description: Patent date (YYYY-MM-DD)
+                    example: "2023-03-15"
+                  start_date:
+                    type: string
+                    format: date
+                    description: Patent start date (YYYY-MM-DD)
+                    example: "2023-01-01"
+                  end_date:
+                    type: string
+                    format: date
+                    description: Patent end date (YYYY-MM-DD)
+                    example: "2043-01-01"
+                  priority:
+                    type: integer
+                    description: Priority ranking (lower is higher priority)
+                    example: 1
+              description: Patents
+      description: Profile enriched with patent data
+    
+    EnrichmentResponse:
+      type: object
+      properties:
+        profiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrichmentProfileData'
+          description: List of enriched profiles
+      description: |
+        Response data for POST /enrichment/profiles.
+        
+        Note: This schema represents the `data` field in the APIResponse envelope.
+        Metadata is provided separately in the `metadata` field of the APIResponse.
+    
+    MoreProfilesJobResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          description: Job ID for tracking via SSE
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        search_id:
+          type: string
+          format: uuid
+          description: Search ID being updated
+          example: "d7b7e1e3-2136-4eb4-872a-8c6dd265d518"
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        status:
+          type: string
+          enum: [IN_PROGRESS]
+          description: Initial job status (always IN_PROGRESS)
+          example: "IN_PROGRESS"
+        profiles_requested:
+          type: integer
+          minimum: 1
+          maximum: 200
+          description: Number of additional profiles requested
+          example: 20
+        user_id:
+          type: string
+          format: uuid
+          description: User ID who initiated the request
+          example: "123e4567-e89b-12d3-a456-426614174000"
+      description: Response data for POST /searches/{search_id}/more-profiles
+    
+    # =====================================================================
+    # SSE EVENT SCHEMAS
+    # =====================================================================
+    
+    SSEJobUpdateEvent:
+      type: object
+      properties:
+        event_id:
+          type: string
+          format: uuid
+          description: Unique event identifier
+          example: "e1234567-e89b-12d3-a456-426614174000"
+        job_id:
+          type: string
+          format: uuid
+          description: Job identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        timestamp:
+          $ref: '#/components/schemas/Timestamp'
+        stage:
+          type: string
+          description: Current processing stage name
+          example: "Extract Requirements"
+        message:
+          type: string
+          description: Human-readable progress message
+          example: "Extracting requirements from your query"
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        is_final:
+          type: boolean
+          description: Whether this is the final event (job complete/failed)
+          example: false
+        metadata:
+          type: ["object", "null"]
+          additionalProperties: true
+          description: |
+            Stage-specific metadata. Fields vary by event type:
+            - Extract Requirements completion: `requirements` (array)
+            - Validate LinkedIn URLs: `urls_extracted` (integer), `profiles_count` (integer)
+            - Aggregate Search Results completion: `total_profiles_found` (integer), `new_relevant_profiles` (integer), `total_relevant_profiles` (integer)
+            - Complete Processing: `search_id` (UUID), optional `finish_reason` (string), `finish_reason_message` (string)
+        error_details:
+          type: ["object", "null"]
+          description: Error details (only present when status is ERROR)
+          properties:
+            code:
+              type: string
+              description: External error code
+              example: "SERVICE_UNAVAILABLE"
+            message:
+              type: string
+              description: User-friendly error message
+              example: "A service is temporarily unavailable. Please try again later."
+      description: SSE event payload for job updates
+    
+    # =====================================================================
+    # METADATA SCHEMAS
+    # =====================================================================
+    
+    SearchProfilesMetadata:
+      type: object
+      properties:
+        results:
+          type: object
+          properties:
+            total_possible_profiles_found:
+              type: integer
+              minimum: 0
+              description: Total profiles found in our database
+              example: 1500
+            total_profiles_scanned:
+              type: integer
+              minimum: 0
+              description: Total profiles our AI has scanned
+              example: 100
+            total_relevant_profiles_found:
+              type: integer
+              minimum: 0
+              description: Profiles passing relevancy assessment
+              example: 20
+      description: Metadata for GET /searches/{search_id}/profiles
+    
+    EnrichmentMetadataAPI:
+      type: object
+      properties:
+        results:
+          type: object
+          properties:
+            total_profiles_requested_enrichment:
+              type: integer
+              minimum: 0
+              description: Total profiles requested for enrichment
+              example: 10
+            total_profiles_enriched:
+              type: integer
+              minimum: 0
+              description: Total profiles successfully enriched
+              example: 8
+            warnings:
+              type: array
+              items:
+                $ref: '#/components/schemas/EnrichmentWarning'
+              description: Warnings about unavailable enrichment types
+              default: []
+      description: Metadata for POST /enrichment/profiles
+    
+    EnrichmentWarning:
+      type: object
+      properties:
+        people_id:
+          type: string
+          format: uuid
+          description: People ID related to warning
+          example: "123e4567-e89b-12d3-a456-426614174001"
+        type:
+          type: string
+          description: Warning type code
+          enum:
+            - W0001_ENRICHMENT_UNAVAILABLE_TYPE
+            - W0002_EMAIL_VALIDATION_REMOVED_ALL
+          example: "W0001_ENRICHMENT_UNAVAILABLE_TYPE"
+        enrichment_type:
+          type: ["string", "null"]
+          description: Enrichment type if applicable
+          example: "email"
+        reason:
+          type: string
+          description: Human-readable reason
+          example: "Profile does not have email data"
+      description: Warning detail for enrichment response
+    
+    MoreProfilesResultsMetadata:
+      type: object
+      properties:
+        total_possible_profiles_found:
+          type: integer
+          minimum: 0
+          description: Total possible profiles matches found
+          example: 1500
+        total_profiles_scanned:
+          type: integer
+          minimum: 0
+          description: Total profiles our AI has scanned
+          example: 100
+        total_relevant_profiles_found:
+          type: integer
+          minimum: 0
+          description: Total accumulated relevant profiles found
+          example: 20
+        total_new_relevant_profiles_found:
+          type: integer
+          minimum: 0
+          description: New relevant profiles found in this execution
+          example: 5
+      description: Metadata results for POST /searches/{search_id}/more-profiles
+    
+    MoreProfilesMetadata:
+      type: object
+      properties:
+        results:
+          $ref: '#/components/schemas/MoreProfilesResultsMetadata'
+      description: Metadata for POST /searches/{search_id}/more-profiles
+    
+    # =====================================================================
+    # STANDARD API RESPONSE ENVELOPE
+    # =====================================================================
+    
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          description: External-facing error code
+          enum:
+            - INVALID_INPUT
+            - RESOURCE_NOT_FOUND
+            - NO_RESULTS_FOUND
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - RATE_LIMIT_EXCEEDED
+            - CONFLICT
+            - SERVICE_UNAVAILABLE
+            - BAD_GATEWAY
+            - INTERNAL_ERROR
+          example: "INVALID_INPUT"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Your request contains invalid data. Please check your input and try again."
+        details:
+          type: ["object", "null"]
+          additionalProperties: true
+          description: Additional error context (e.g., validation errors)
+      description: Error details structure
+    
+    APIResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Whether the request was successful
+          example: true
+        data:
+          oneOf:
+            - $ref: '#/components/schemas/SearchQueryResponse'
+            - $ref: '#/components/schemas/SearchProfilesResponse'
+            - $ref: '#/components/schemas/EnrichmentResponse'
+            - $ref: '#/components/schemas/MoreProfilesJobResponse'
+            - type: object
+            - type: "null"
+          description: Response data (null for errors)
+        metadata:
+          oneOf:
+            - $ref: '#/components/schemas/SearchProfilesMetadata'
+            - $ref: '#/components/schemas/EnrichmentMetadataAPI'
+            - $ref: '#/components/schemas/MoreProfilesMetadata'
+            - type: object
+            - type: "null"
+          description: Endpoint-specific metadata
+        error:
+          oneOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: "null"
+          description: Error details (null for success)
+        request_id:
+          type: string
+          format: uuid
+          description: Unique request identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        processing_time_ms:
+          type: integer
+          description: Server processing time in milliseconds
+          example: 1234
+      description: Standard API response envelope for all endpoints
+
+  responses:
+    # =====================================================================
+    # SUCCESS RESPONSES
+    # =====================================================================
+    
+    200_OK:
+      description: Successful operation
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/APIResponse'
+    
+    201_Created:
+      description: Resource created successfully
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/APIResponse'
+    
+    # =====================================================================
+    # ERROR RESPONSES
+    # =====================================================================
+    
+    400_BadRequest:
+      description: Invalid request data or validation error
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/APIResponse'
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: "null"
+                  metadata:
+                    type: "null"
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [INVALID_INPUT]
+                      message:
+                        type: string
+                        example: "Your request contains invalid data. Please check your input and try again."
+                      details:
+                        type: object
+                        description: Validation error details
+                        example:
+                          field: "query"
+                          error: "Field is required"
+          example:
+            success: false
+            data: null
+            metadata: null
+            error:
+              code: "INVALID_INPUT"
+              message: "Your request contains invalid data. Please check your input and try again."
+              details:
+                field: "query"
+                error: "Field is required"
+            request_id: "550e8400-e29b-41d4-a716-446655440000"
+            processing_time_ms: 50
+    
+    401_Unauthorized:
+      description: Missing or invalid API key
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/APIResponse'
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: "null"
+                  metadata:
+                    type: "null"
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [UNAUTHORIZED]
+                      message:
+                        type: string
+                        example: "Missing or invalid API key"
+          example:
+            success: false
+            data: null
+            metadata: null
+            error:
+              code: "UNAUTHORIZED"
+              message: "Missing or invalid API key"
+            request_id: "550e8400-e29b-41d4-a716-446655440000"
+            processing_time_ms: 20
+    
+    403_Forbidden:
+      description: Insufficient permissions or access denied
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/APIResponse'
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: "null"
+                  metadata:
+                    type: "null"
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [FORBIDDEN]
+                      message:
+                        type: string
+                        example: "Access denied. You don't have permission to access this resource."
+          example:
+            success: false
+            data: null
+            metadata: null
+            error:
+              code: "FORBIDDEN"
+              message: "Access denied. You don't have permission to access this resource."
+            request_id: "550e8400-e29b-41d4-a716-446655440000"
+            processing_time_ms: 30
+    
+    404_NotFound:
+      description: Resource not found
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/APIResponse'
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: "null"
+                  metadata:
+                    type: "null"
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [RESOURCE_NOT_FOUND, NO_RESULTS_FOUND]
+                      message:
+                        type: string
+                        example: "Search not found"
+          example:
+            success: false
+            data: null
+            metadata: null
+            error:
+              code: "RESOURCE_NOT_FOUND"
+              message: "Search not found"
+            request_id: "550e8400-e29b-41d4-a716-446655440000"
+            processing_time_ms: 40
+    
+    429_RateLimitExceeded:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+            enum: [0]
+          description: Requests remaining (always 0 for rate limit errors)
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          schema:
+            type: integer
+            description: Seconds to wait before retrying
+            example: 60
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/APIResponse'
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: "null"
+                  metadata:
+                    type: "null"
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [RATE_LIMIT_EXCEEDED]
+                      message:
+                        type: string
+                        example: "Rate limit exceeded. Please wait before making another request."
+          example:
+            success: false
+            data: null
+            metadata: null
+            error:
+              code: "RATE_LIMIT_EXCEEDED"
+              message: "Rate limit exceeded. Please wait before making another request."
+            request_id: "550e8400-e29b-41d4-a716-446655440000"
+            processing_time_ms: 10
+    
+    500_InternalServerError:
+      description: Internal server error
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/APIResponse'
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: "null"
+                  metadata:
+                    type: "null"
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [INTERNAL_ERROR]
+                      message:
+                        type: string
+                        example: "An unexpected error occurred. Please try again later."
+          example:
+            success: false
+            data: null
+            metadata: null
+            error:
+              code: "INTERNAL_ERROR"
+              message: "An unexpected error occurred. Please try again later."
+            request_id: "550e8400-e29b-41d4-a716-446655440000"
+            processing_time_ms: 100
+    
+    502_BadGateway:
+      description: External service error
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/APIResponse'
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: "null"
+                  metadata:
+                    type: "null"
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [BAD_GATEWAY]
+                      message:
+                        type: string
+                        example: "External service error. Please try again later."
+          example:
+            success: false
+            data: null
+            metadata: null
+            error:
+              code: "BAD_GATEWAY"
+              message: "External service error. Please try again later."
+            request_id: "550e8400-e29b-41d4-a716-446655440000"
+            processing_time_ms: 5000
+    
+    503_ServiceUnavailable:
+      description: Service temporarily unavailable
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/APIResponse'
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: "null"
+                  metadata:
+                    type: "null"
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [SERVICE_UNAVAILABLE]
+                      message:
+                        type: string
+                        example: "Service temporarily unavailable. Please retry your request."
+          example:
+            success: false
+            data: null
+            metadata: null
+            error:
+              code: "SERVICE_UNAVAILABLE"
+              message: "Service temporarily unavailable. Please retry your request."
+            request_id: "550e8400-e29b-41d4-a716-446655440000"
+            processing_time_ms: 200
+
+  headers:
+    X-RateLimit-Limit:
+      description: Maximum requests allowed in the time window
+      schema:
+        type: integer
+        example: 10
+    
+    X-RateLimit-Remaining:
+      description: Requests remaining in current time window
+      schema:
+        type: integer
+        example: 8
+    
+    X-RateLimit-Reset:
+      description: Unix timestamp when rate limit resets
+      schema:
+        type: integer
+        example: 1703347200
+
+paths:
+  /searches/query:
+    post:
+      summary: Query
+      description: |
+        Execute a natural language search query to find professional profiles that match your criteria. This endpoint processes your query using AI to understand requirements, searches through professional databases, and returns relevant profiles with relevancy scores. The search runs asynchronously, so you'll receive a `job_id` immediately. Use the `GET /jobs/{job_id}/stream` endpoint to track progress in real-time.
+      operationId: executeSearchQuery
+      tags:
+        - Searches
+      security:
+        - ApiKeyAuth: []
+      x-scopes:
+        - searches:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequestV1'
+            examples:
+              "Basic search":
+                summary: Basic search query
+                value:
+                  query: "Find partnership managers at Google in UK"
+              "Specific requirements":
+                summary: Search with specific requirements
+                value:
+                  query: "Find partnership managers at Google in UK"
+              "Search by linkedin url":
+                summary: Search by LinkedIn URL
+                value:
+                  query: "Find partnership managers at Google in UK"
+      responses:
+        '201':
+          description: Query accepted and processing started
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/SearchQueryResponse'
+                  metadata:
+                    type: "null"
+                  error:
+                    type: "null"
+                  request_id:
+                    type: string
+                    format: uuid
+                  processing_time_ms:
+                    type: integer
+              example:
+                success: true
+                data:
+                  job_id: "550e8400-e29b-41d4-a716-446655440000"
+                  query: "Find partnership managers at Google in UK"
+                  user_id: "123e4567-e89b-12d3-a456-426614174000"
+                  api_key_id: "789e4567-e89b-12d3-a456-426614174000"
+                metadata: null
+                error: null
+                request_id: "abc12345-e89b-12d3-a456-426614174000"
+                processing_time_ms: 85
+        '400':
+          $ref: '#/components/responses/400_BadRequest'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          description: Forbidden - Insufficient scope or parallel limit exceeded
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/APIResponse'
+                  - type: object
+                    properties:
+                      success:
+                        type: boolean
+                      data:
+                        type: "null"
+                      metadata:
+                        type: "null"
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            type: string
+                            enum: [FORBIDDEN]
+                          message:
+                            type: string
+              examples:
+                "Insufficient scope":
+                  summary: Insufficient API key scope
+                  value:
+                    success: false
+                    data: null
+                    metadata: null
+                    error:
+                      code: "FORBIDDEN"
+                      message: "API key does not have required scope: searches:create"
+                    request_id: "550e8400-e29b-41d4-a716-446655440000"
+                    processing_time_ms: 25
+                "Parallel limit":
+                  summary: Parallel execution limit exceeded
+                  value:
+                    success: false
+                    data: null
+                    metadata: null
+                    error:
+                      code: "FORBIDDEN"
+                      message: "You have reached the maximum concurrent search limit (3). Please wait for a search to complete."
+                    request_id: "550e8400-e29b-41d4-a716-446655440000"
+                    processing_time_ms: 30
+        '429':
+          $ref: '#/components/responses/429_RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/500_InternalServerError'
+        '503':
+          $ref: '#/components/responses/503_ServiceUnavailable'
+  
+  /searches/{search_id}/profiles:
+    get:
+      summary: Retrieve Profiles
+      description: |
+        Retrieve all profiles found by a completed search, including relevancy scores and any enrichment data you've added. Profiles are returned in relevancy order (highest to lowest), making it easy to identify the best matches. The response includes search statistics showing how many profiles were found, scanned, and matched your criteria.
+        
+        **Getting the search_id**: After executing a query via `POST /searches/query`, stream the job progress using `GET /jobs/{job_id}/stream`. The `search_id` is included in the `metadata` field of the final event (when `is_final: true` and `status: "COMPLETED"`).
+      operationId: getSearchProfiles
+      tags:
+        - Searches
+      security:
+        - ApiKeyAuth: []
+      x-scopes:
+        - searches:read
+      parameters:
+        - name: search_id
+          in: path
+          required: true
+          description: Unique identifier of the search
+          schema:
+            type: string
+            format: uuid
+          example: "d7b7e1e3-2136-4eb4-872a-8c6dd265d518"
+      responses:
+        '200':
+          description: Successfully retrieved search profiles
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/SearchProfilesResponse'
+                  metadata:
+                    $ref: '#/components/schemas/SearchProfilesMetadata'
+                  error:
+                    type: "null"
+                  request_id:
+                    type: string
+                    format: uuid
+                  processing_time_ms:
+                    type: integer
+              example:
+                success: true
+                data:
+                  summarised_query: "Find partnership managers at Google in UK"
+                  profiles:
+                    - {}
+                    # Profile objects contain assembled data (see Profile Schema documentation for complete structure)
+                metadata:
+                  results:
+                    total_possible_profiles_found: 1500
+                    total_profiles_scanned: 100
+                    total_relevant_profiles_found: 20
+                error: null
+                request_id: "abc12345-e89b-12d3-a456-426614174000"
+                processing_time_ms: 1250
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          description: Search not found or access denied
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/APIResponse'
+                  - type: object
+                    properties:
+                      success:
+                        type: boolean
+                      data:
+                        type: "null"
+                      metadata:
+                        type: "null"
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            type: string
+                            enum: [RESOURCE_NOT_FOUND]
+                          message:
+                            type: string
+              example:
+                success: false
+                data: null
+                metadata: null
+                error:
+                  code: "RESOURCE_NOT_FOUND"
+                  message: "Search not found or you don't have access to it"
+                request_id: "550e8400-e29b-41d4-a716-446655440000"
+                processing_time_ms: 45
+        '500':
+          $ref: '#/components/responses/500_InternalServerError'
+  
+  /searches/{search_id}/more-profiles:
+    post:
+      summary: More Profiles
+      description: |
+        Fetch additional profiles for an existing search when you need more results. This endpoint uses the same search context and criteria as your original search to find additional relevant profiles. The process runs asynchronously, so you'll receive a `job_id` immediately. Use the `GET /jobs/{job_id}/stream` endpoint to track progress in real-time. Once complete, the new profiles are automatically merged with your existing results. You can use the `GET /searches/{search_id}/profiles` endpoint to retrieve the updated search results.
+        
+        **Request Profile Count**: You can request between 1-200 additional profiles per call. Adding 50 profiles typically takes 1-2 minutes, depending on the complexity of the search. If you want faster response times, we recommend making iterative requests with a lower profile count (e.g., 20 profiles per request) to receive more frequent search updates.
+        
+        The requested profile count is treated as a target, not a guarantee. The endpoint may return more profiles than requested if it finds additional relevant matches, or fewer profiles than requested if it exhausts the effort budget assigned to the AI for the search.
+      operationId: fetchMoreProfiles
+      tags:
+        - Searches
+      security:
+        - ApiKeyAuth: []
+      x-scopes:
+        - searches:create
+      parameters:
+        - name: search_id
+          in: path
+          required: true
+          description: Unique identifier of the existing search
+          schema:
+            type: string
+            format: uuid
+          example: "d7b7e1e3-2136-4eb4-872a-8c6dd265d518"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoreProfilesRequest'
+            examples:
+              "Fetch 20":
+                summary: Fetch 20 additional profiles
+                value:
+                  profiles_requested: 20
+              "Fetch 50":
+                summary: Fetch 50 additional profiles
+                value:
+                  profiles_requested: 50
+      responses:
+        '200':
+          description: Request accepted and processing started
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/MoreProfilesJobResponse'
+                  metadata:
+                    $ref: '#/components/schemas/MoreProfilesMetadata'
+                  error:
+                    type: "null"
+                  request_id:
+                    type: string
+                    format: uuid
+                  processing_time_ms:
+                    type: integer
+              example:
+                success: true
+                data:
+                  job_id: "550e8400-e29b-41d4-a716-446655440000"
+                  search_id: "d7b7e1e3-2136-4eb4-872a-8c6dd265d518"
+                  created_at: "2025-12-23T10:30:00.000Z"
+                  status: "IN_PROGRESS"
+                  profiles_requested: 20
+                  user_id: "123e4567-e89b-12d3-a456-426614174000"
+                metadata:
+                  results:
+                    total_possible_profiles_found: 1500
+                    total_profiles_scanned: 100
+                    total_relevant_profiles_found: 20
+                    total_new_relevant_profiles_found: 0
+                error: null
+                request_id: "abc12345-e89b-12d3-a456-426614174000"
+                processing_time_ms: 75
+        '400':
+          $ref: '#/components/responses/400_BadRequest'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          description: Search not found or access denied
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/APIResponse'
+                  - type: object
+                    properties:
+                      success:
+                        type: boolean
+                      data:
+                        type: "null"
+                      metadata:
+                        type: "null"
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            type: string
+                            enum: [RESOURCE_NOT_FOUND]
+                          message:
+                            type: string
+              example:
+                success: false
+                data: null
+                metadata: null
+                error:
+                  code: "RESOURCE_NOT_FOUND"
+                  message: "Search not found or you don't have access to it"
+                request_id: "550e8400-e29b-41d4-a716-446655440000"
+                processing_time_ms: 40
+        '429':
+          $ref: '#/components/responses/429_RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/500_InternalServerError'
+        '503':
+          $ref: '#/components/responses/503_ServiceUnavailable'
+  
+  /enrichment/profiles:
+    post:
+      summary: Enrich Profiles
+      description: |
+        Enrich existing profiles with additional contact information or professional achievements. This endpoint adds valuable data to profiles you've found through searches, such as email addresses, phone numbers, awards, publications, memberships, or patents. You can enrich up to 50 profiles per request, and each request focuses on one enrichment type. The endpoint validates profile existence before processing and returns warnings if enrichment data is unavailable for specific profiles.
+      operationId: enrichProfiles
+      tags:
+        - Enrichment
+      security:
+        - ApiKeyAuth: []
+      x-scopes:
+        - enrichment:read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrichmentRequest'
+            examples:
+              "Email enrichment":
+                summary: Enrich with emails
+                value:
+                  people_ids:
+                    - "123e4567-e89b-12d3-a456-426614174000"
+                    - "123e4567-e89b-12d3-a456-426614174001"
+                  enrichment_type: "email"
+              "Phone enrichment":
+                summary: Enrich with phone numbers
+                value:
+                  people_ids:
+                    - "123e4567-e89b-12d3-a456-426614174000"
+                  enrichment_type: "phone"
+      responses:
+        '200':
+          description: Enrichment completed successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/EnrichmentResponse'
+                  metadata:
+                    $ref: '#/components/schemas/EnrichmentMetadataAPI'
+                  error:
+                    type: "null"
+                  request_id:
+                    type: string
+                    format: uuid
+                  processing_time_ms:
+                    type: integer
+              example:
+                success: true
+                data:
+                  profiles:
+                    - people_id: "123e4567-e89b-12d3-a456-426614174000"
+                      contact_data:
+                        contact_emails:
+                          - email: "john.doe@example.com"
+                metadata:
+                  results:
+                    total_profiles_requested_enrichment: 2
+                    total_profiles_enriched: 1
+                    warnings:
+                      - people_id: "123e4567-e89b-12d3-a456-426614174001"
+                        type: "W0001_ENRICHMENT_UNAVAILABLE_TYPE"
+                        enrichment_type: "email"
+                        reason: "Profile does not have email data"
+                error: null
+                request_id: "abc12345-e89b-12d3-a456-426614174000"
+                processing_time_ms: 250
+        '400':
+          $ref: '#/components/responses/400_BadRequest'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          description: One or more profiles not found
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/APIResponse'
+                  - type: object
+                    properties:
+                      success:
+                        type: boolean
+                      data:
+                        type: "null"
+                      metadata:
+                        type: "null"
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            type: string
+                            enum: [RESOURCE_NOT_FOUND]
+                          message:
+                            type: string
+                          details:
+                            type: object
+                            properties:
+                              not_found_ids:
+                                type: array
+                                items:
+                                  type: string
+              example:
+                success: false
+                data: null
+                metadata: null
+                error:
+                  code: "RESOURCE_NOT_FOUND"
+                  message: "One or more requested profiles were not found"
+                  details:
+                    not_found_ids:
+                      - "999e4567-e89b-12d3-a456-426614174999"
+                request_id: "550e8400-e29b-41d4-a716-446655440000"
+                processing_time_ms: 60
+        '429':
+          $ref: '#/components/responses/429_RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/500_InternalServerError'
+        '502':
+          $ref: '#/components/responses/502_BadGateway'
+        '503':
+          $ref: '#/components/responses/503_ServiceUnavailable'
+  
+  /jobs/{job_id}/stream:
+    get:
+      summary: Stream Job Updates
+      description: |
+        Stream real-time progress updates for asynchronous operations like searches and profile fetching using Server-Sent Events (SSE). This endpoint provides live updates on job status, current processing stage, and completion status. You'll receive events as the job progresses through different stages, with a final event when the job completes or encounters an error. The stream automatically closes after the final event.
+      operationId: streamJobUpdates
+      tags:
+        - Jobs
+      security:
+        - ApiKeyAuth: []
+      x-scopes:
+        - jobs:read
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          description: Unique identifier of the job
+          schema:
+            type: string
+            format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: SSE stream established successfully
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Server-Sent Events stream with job updates.
+                  
+                  **SSE Event Format:**
+                  
+                  Each event follows the SSE specification format:
+                  
+                  ```
+                  id: <event_id>
+                  event: job_update
+                  data: <JSON object>
+                  ```
+                  
+                  **Event Fields:**
+                  - `id`: Event identifier (UUID) - unique ID for this event
+                  - `event`: Event type (always "job_update")
+                  - `data`: JSON payload containing job progress information
+                  
+                  **Data Payload Structure:**
+                  
+                  The `data` field contains a JSON object with the following structure (see SSEJobUpdateEvent schema for complete details):
+                  
+                  - `event_id` (string, UUID): Unique event identifier
+                  - `job_id` (string, UUID): Job identifier this event belongs to
+                  - `timestamp` (string, ISO-8601): Event timestamp in UTC
+                  - `stage` (string): Current processing stage name (e.g., "Extract Requirements", "Complete Processing")
+                  - `message` (string): Human-readable progress message
+                  - `status` (string, enum): Job status - `IN_PROGRESS`, `COMPLETED`, or `ERROR`
+                  - `is_final` (boolean): Whether this is the final event (stream closes after final event)
+                  - `metadata` (object, nullable): Metadata included in events. For most progress events, this field is `null`. The final event (when `is_final: true` and `status: "COMPLETED"`) includes `search_id` in metadata, and optionally `finish_reason` and `finish_reason_message` if the search completed with specific conditions.
+                  - `error_details` (object, nullable): Error information if status is `ERROR` (contains `code` and `message`)
+                  
+                  **Obtaining the search_id:**
+                  
+                  After executing a query via `POST /searches/query`, stream the job progress using this endpoint. The `search_id` is included in the `metadata` field of the final event when the job completes successfully. Specifically, look for the event where `is_final: true` and `status: "COMPLETED"`. The `metadata` object will contain a `search_id` field (UUID) that you can use to retrieve search results via the `GET /searches/{search_id}/profiles` endpoint.
+                  
+                  **Stream Behavior:**
+                  
+                  Events are sent as they occur during job execution. The stream closes automatically after the final event (when `is_final: true`).
+                  
+                  **Job Completion Scenarios:**
+                  
+                  A job can finish in one of the following ways:
+                  
+                  1. **Successful Completion**: The job completes successfully with `status: "COMPLETED"` and `is_final: true`. The `metadata` field contains `search_id` (UUID) that you can use to retrieve results. This is the standard success path.
+                  
+                  2. **Completion with Finish Reasons**: The job completes with `status: "COMPLETED"` but includes a `finish_reason` in `metadata` indicating why the search completed in a particular state. These are valid completion states, not errors:
+                     - `DOMAIN_VIOLATION`: Your query is not about people search. Reframe it to focus on finding specific people.
+                     - `UNCLEAR_REQUIREMENTS`: Your query needs more specific details (location, industry, role, etc.) to find the right people.
+                     - `PROFILES_EXHAUSTED`: All available profiles for this search have been fetched. No additional profiles are available.
+                     - `NO_RELEVANT_PROFILES_FOUND`: No relevant profiles were found matching your search criteria. Try adjusting your requirements.
+                  
+                  3. **Error**: The job fails with `status: "ERROR"` and `is_final: true`. The `error_details` field contains a `code` (error code) and `message` (user-friendly error message) explaining what went wrong. This indicates a system error or service unavailability, not a query issue.
+              examples:
+                "Progress event":
+                  summary: Progress update event
+                  value: |
+                    id: e1234567-e89b-12d3-a456-426614174000
+                    event: job_update
+                    data: {
+                      "event_id": "e1234567-e89b-12d3-a456-426614174000",
+                      "job_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "timestamp": "2025-12-23T10:30:05.000Z",
+                      "stage": "Extract Requirements",
+                      "message": "Extracting requirements from your query",
+                      "status": "IN_PROGRESS",
+                      "is_final": false,
+                      "metadata": null,
+                      "error_details": null
+                    }
+                    
+                "Final event":
+                  summary: Final completion event
+                  value: |
+                    id: e1234567-e89b-12d3-a456-426614174999
+                    event: job_update
+                    data: {
+                      "event_id": "e1234567-e89b-12d3-a456-426614174999",
+                      "job_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "timestamp": "2025-12-23T10:30:45.000Z",
+                      "stage": "Complete Processing",
+                      "message": "Query processing completed",
+                      "status": "COMPLETED",
+                      "is_final": true,
+                      "metadata": {
+                        "search_id": "d7b7e1e3-2136-4eb4-872a-8c6dd265d518"
+                      },
+                      "error_details": null
+                    }
+                    
+                "Error event":
+                  summary: Final error event
+                  value: |
+                    id: e1234567-e89b-12d3-a456-426614175000
+                    event: job_update
+                    data: {
+                      "event_id": "e1234567-e89b-12d3-a456-426614175000",
+                      "job_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "timestamp": "2025-12-23T10:30:50.000Z",
+                      "stage": "Error",
+                      "message": "A service is temporarily unavailable. Please try again later.",
+                      "status": "ERROR",
+                      "is_final": true,
+                      "metadata": null,
+                      "error_details": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "A service is temporarily unavailable. Please try again later."
+                      }
+                    }
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          description: Job not found or access denied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "Job not found or access denied."
+              example:
+                detail: "Job not found or access denied."
+
