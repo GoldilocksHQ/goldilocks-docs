@@ -122,6 +122,13 @@ components:
           minLength: 1
           description: Natural language search query
           example: "Find partnership managers at Google in UK"
+        profiles_requested:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 20
+          description: Number of profiles to return (1-200, default 20)
+          example: 20
       description: Request body for executing a search query
     
     EnrichmentRequest:
@@ -133,12 +140,11 @@ components:
         people_ids:
           type: array
           items:
-            type: string
-            format: uuid
+            $ref: '#/components/schemas/UUID'
           minItems: 1
           maxItems: 50
           description: List of people IDs to enrich (max 50 per request)
-          example:
+          example: 
             - "123e4567-e89b-12d3-a456-426614174000"
             - "123e4567-e89b-12d3-a456-426614174001"
         enrichment_type:
@@ -164,6 +170,10 @@ components:
     
     SearchQueryResponse:
       type: object
+      required:
+        - job_id
+        - query
+        - user_id
       properties:
         job_id:
           type: string
@@ -177,13 +187,13 @@ components:
         user_id:
           type: string
           format: uuid
-          description: User ID who initiated the request
+          description: User ID who initiated the search
           example: "123e4567-e89b-12d3-a456-426614174000"
         api_key_id:
           type: ["string", "null"]
           format: uuid
-          description: API key ID used for authentication (null if not applicable)
-          example: "789e4567-e89b-12d3-a456-426614174000"
+          description: API key ID used for the request (null if not applicable)
+          example: "abc12345-e89b-12d3-a456-426614174000"
       description: Response data for POST /searches/query
     
     ProfileData:
@@ -229,301 +239,72 @@ components:
         summarised_query:
           type: ["string", "null"]
           description: Summarised version of the search query
-          example: "Find partnership managers at Google in UK"
+          example: "Software engineers in San Francisco with Python experience"
         profiles:
           type: array
           items:
             $ref: '#/components/schemas/ProfileData'
-          description: |
-            Array of assembled profile objects with relevancy scores. See the [Profile Schema](/api-reference/schema/profile) documentation for complete field descriptions and structure.
+          description: Array of assembled profile objects with relevancy scores
       description: Response data for GET /searches/{search_id}/profiles
     
     EnrichmentProfileData:
-      oneOf:
-        - title: Email
-          $ref: '#/components/schemas/EnrichmentProfileDataEmail'
-        - title: Phone
-          $ref: '#/components/schemas/EnrichmentProfileDataPhone'
-        - title: Award
-          $ref: '#/components/schemas/EnrichmentProfileDataAward'
-        - title: Publication
-          $ref: '#/components/schemas/EnrichmentProfileDataPublication'
-        - title: Membership
-          $ref: '#/components/schemas/EnrichmentProfileDataMembership'
-        - title: Patent
-          $ref: '#/components/schemas/EnrichmentProfileDataPatent'
-      description: Profile with enrichment data. Structure depends on the enrichment_type requested. Only one enrichment type is returned per request.
-    
-    EnrichmentProfileDataEmail:
       type: object
+      required:
+        - people_id
       properties:
         people_id:
           type: string
           format: uuid
           description: Profile identifier
           example: "123e4567-e89b-12d3-a456-426614174000"
-        contact_data:
-          type: object
-          properties:
-            contact_emails:
-              type: array
-              items:
-                type: object
-                properties:
-                  email:
-                    type: string
-                    format: email
-                    description: Email address
-                    example: "john.doe@example.com"
-              description: Email addresses
-      description: Profile enriched with email data
-    
-    EnrichmentProfileDataPhone:
-      type: object
-      properties:
-        people_id:
-          type: string
-          format: uuid
-          description: Profile identifier
-          example: "123e4567-e89b-12d3-a456-426614174000"
-        contact_data:
-          type: object
-          properties:
-            contact_phones:
-              type: array
-              items:
-                type: object
-                properties:
-                  phone:
-                    type: string
-                    description: Phone number
-                    example: "+1-415-555-0123"
-                  ddi:
-                    type: ["boolean", "null"]
-                    description: Direct dial indicator
-                    example: false
-                  dnc:
-                    type: ["boolean", "null"]
-                    description: Do not call indicator
-                    example: false
-              description: Phone numbers
-      description: Profile enriched with phone data
-    
-    EnrichmentProfileDataAward:
-      type: object
-      properties:
-        people_id:
-          type: string
-          format: uuid
-          description: Profile identifier
-          example: "123e4567-e89b-12d3-a456-426614174000"
-        resume_data:
-          type: object
-          properties:
-            awards:
-              type: array
-              items:
-                type: object
-                properties:
-                  name:
-                    type: string
-                    description: Award name
-                    example: "Employee of the Year"
-                  description:
-                    type: string
-                    description: Award description
-                    example: "Recognized for outstanding performance"
-                  issue:
-                    type: string
-                    description: Award issuer
-                    example: "Tech Corp"
-                  date:
-                    type: string
-                    format: date
-                    description: Award date (YYYY-MM-DD)
-                    example: "2023-12-01"
-              description: Professional awards
-      description: Profile enriched with award data
-    
-    EnrichmentProfileDataPublication:
-      type: object
-      properties:
-        people_id:
-          type: string
-          format: uuid
-          description: Profile identifier
-          example: "123e4567-e89b-12d3-a456-426614174000"
-        resume_data:
-          type: object
-          properties:
-            publications:
-              type: array
-              items:
-                type: object
-                properties:
-                  name:
-                    type: string
-                    description: Publication name
-                    example: "Machine Learning in Practice"
-                  description:
-                    type: string
-                    description: Publication description
-                    example: "A comprehensive guide to ML applications"
-                  reference:
-                    type: string
-                    description: Publication reference
-                    example: "ISBN: 978-0-123456-78-9"
-                  issue:
-                    type: string
-                    description: Publication issue
-                    example: "Volume 5, Issue 2"
-                  web_address:
-                    type: object
-                    properties:
-                      url:
-                        type: string
-                        format: uri
-                        description: Web URL
-                        example: "https://example.com/publication"
-                  date:
-                    type: string
-                    format: date
-                    description: Publication date (YYYY-MM-DD)
-                    example: "2023-06-15"
-              description: Publications
-      description: Profile enriched with publication data
-    
-    EnrichmentProfileDataMembership:
-      type: object
-      properties:
-        people_id:
-          type: string
-          format: uuid
-          description: Profile identifier
-          example: "123e4567-e89b-12d3-a456-426614174000"
-        resume_data:
-          type: object
-          properties:
-            memberships:
-              type: array
-              items:
-                type: object
-                properties:
-                  title:
-                    type: string
-                    description: Membership title
-                    example: "Board Member"
-                  description:
-                    type: string
-                    description: Membership description
-                    example: "Served on the board of directors"
-                  reference:
-                    type: string
-                    description: Membership reference
-                    example: "Member ID: 12345"
-                  web_address:
-                    type: object
-                    properties:
-                      url:
-                        type: string
-                        format: uri
-                        description: Web URL
-                        example: "https://example.com/organization"
-                  name:
-                    type: string
-                    description: Organization name
-                    example: "Tech Industry Association"
-                  start_date:
-                    type: string
-                    format: date
-                    description: Membership start date (YYYY-MM-DD)
-                    example: "2020-01-01"
-                  end_date:
-                    type: ["string", "null"]
-                    format: date
-                    description: Membership end date (YYYY-MM-DD), null if current
-                    example: "2024-12-31"
-                  location:
-                    type: string
-                    description: Membership location
-                    example: "San Francisco, CA"
-              description: Professional memberships
-      description: Profile enriched with membership data
-    
-    EnrichmentProfileDataPatent:
-      type: object
-      properties:
-        people_id:
-          type: string
-          format: uuid
-          description: Profile identifier
-          example: "123e4567-e89b-12d3-a456-426614174000"
-        resume_data:
-          type: object
-          properties:
-            patents:
-              type: array
-              items:
-                type: object
-                properties:
-                  name:
-                    type: string
-                    description: Patent name
-                    example: "Advanced Machine Learning Algorithm"
-                  issue:
-                    type: string
-                    description: Patent issue
-                    example: "US Patent Office"
-                  number:
-                    type: string
-                    description: Patent number
-                    example: "US123456789"
-                  web_address:
-                    type: object
-                    properties:
-                      url:
-                        type: string
-                        format: uri
-                        description: Web URL
-                        example: "https://patents.google.com/patent/US123456789"
-                  date:
-                    type: string
-                    format: date
-                    description: Patent date (YYYY-MM-DD)
-                    example: "2023-03-15"
-                  start_date:
-                    type: string
-                    format: date
-                    description: Patent start date (YYYY-MM-DD)
-                    example: "2023-01-01"
-                  end_date:
-                    type: string
-                    format: date
-                    description: Patent end date (YYYY-MM-DD)
-                    example: "2043-01-01"
-                  priority:
-                    type: integer
-                    description: Priority ranking (lower is higher priority)
-                    example: 1
-              description: Patents
-      description: Profile enriched with patent data
+      additionalProperties: true
+      description: |
+        Profile with enrichment data. Structure depends on enrichment_type:
+        
+        **Email enrichment**:
+        - `email` (array): Email addresses with priority
+        
+        **Phone enrichment**:
+        - `phone` (array): Phone numbers with type and priority
+        
+        **Award enrichment**:
+        - `award` (array): Professional awards
+        
+        **Publication enrichment**:
+        - `publication` (array): Publications
+        
+        **Membership enrichment**:
+        - `membership` (array): Professional memberships
+        
+        **Patent enrichment**:
+        - `patent` (array): Patents
+      example:
+        people_id: "123e4567-e89b-12d3-a456-426614174000"
+        email:
+          - email: "john.doe@example.com"
+            priority: 1
     
     EnrichmentResponse:
       type: object
+      required:
+        - profiles
       properties:
         profiles:
           type: array
           items:
             $ref: '#/components/schemas/EnrichmentProfileData'
-          description: List of enriched profiles
-      description: |
-        Response data for POST /enrichment/profiles.
-        
-        Note: This schema represents the `data` field in the APIResponse envelope.
-        Metadata is provided separately in the `metadata` field of the APIResponse.
+          description: List of enriched profiles with their enrichment data
+      description: Response data for POST /enrichment/profiles. Metadata is returned at the envelope level, not nested here.
     
     MoreProfilesJobResponse:
       type: object
+      required:
+        - job_id
+        - search_id
+        - created_at
+        - status
+        - profiles_requested
+        - user_id
       properties:
         job_id:
           type: string
@@ -537,6 +318,11 @@ components:
           example: "d7b7e1e3-2136-4eb4-872a-8c6dd265d518"
         created_at:
           $ref: '#/components/schemas/Timestamp'
+        user_id:
+          type: string
+          format: uuid
+          description: User ID who initiated the request
+          example: "123e4567-e89b-12d3-a456-426614174000"
         status:
           type: string
           enum: [IN_PROGRESS]
@@ -548,11 +334,6 @@ components:
           maximum: 200
           description: Number of additional profiles requested
           example: 20
-        user_id:
-          type: string
-          format: uuid
-          description: User ID who initiated the request
-          example: "123e4567-e89b-12d3-a456-426614174000"
       description: Response data for POST /searches/{search_id}/more-profiles
     
     # =====================================================================
@@ -561,6 +342,14 @@ components:
     
     SSEJobUpdateEvent:
       type: object
+      required:
+        - event_id
+        - job_id
+        - timestamp
+        - stage
+        - message
+        - status
+        - is_final
       properties:
         event_id:
           type: string
@@ -595,7 +384,7 @@ components:
             Stage-specific metadata. Fields vary by event type:
             - Extract Requirements completion: `requirements` (array)
             - Validate LinkedIn URLs: `urls_extracted` (integer), `profiles_count` (integer)
-            - Aggregate Search Results completion: `total_profiles_found` (integer), `new_relevant_profiles` (integer), `total_relevant_profiles` (integer)
+            - Aggregate Search Results: `search_id` (UUID), `new_relevant_profiles` (integer), `total_relevant_profiles` (integer) - **Use search_id to retrieve profiles via GET /searches/{search_id}/profiles**
             - Complete Processing: `search_id` (UUID), optional `finish_reason` (string), `finish_reason_message` (string)
         error_details:
           type: ["object", "null"]
@@ -617,32 +406,34 @@ components:
     
     SearchProfilesMetadata:
       type: object
+      required:
+        - results
       properties:
         results:
           type: object
+          required:
+            - total_profiles
           properties:
-            total_possible_profiles_found:
+            total_profiles:
               type: integer
               minimum: 0
-              description: Total profiles found in our database
-              example: 1500
-            total_profiles_scanned:
-              type: integer
-              minimum: 0
-              description: Total profiles our AI has scanned
-              example: 100
-            total_relevant_profiles_found:
-              type: integer
-              minimum: 0
-              description: Profiles passing relevancy assessment
+              description: |
+                Total number of profiles available for this search.
+                Calculated as min(relevant_profile_count, requested_profiles_count).
+                Represents the actual number of profiles the user can access.
               example: 20
       description: Metadata for GET /searches/{search_id}/profiles
     
     EnrichmentMetadataAPI:
       type: object
+      required:
+        - results
       properties:
         results:
           type: object
+          required:
+            - total_profiles_requested_enrichment
+            - total_profiles_enriched
           properties:
             total_profiles_requested_enrichment:
               type: integer
@@ -657,67 +448,10 @@ components:
             warnings:
               type: array
               items:
-                $ref: '#/components/schemas/EnrichmentWarning'
+                type: object
               description: Warnings about unavailable enrichment types
               default: []
       description: Metadata for POST /enrichment/profiles
-    
-    EnrichmentWarning:
-      type: object
-      properties:
-        people_id:
-          type: string
-          format: uuid
-          description: People ID related to warning
-          example: "123e4567-e89b-12d3-a456-426614174001"
-        type:
-          type: string
-          description: Warning type code
-          enum:
-            - W0001_ENRICHMENT_UNAVAILABLE_TYPE
-            - W0002_EMAIL_VALIDATION_REMOVED_ALL
-          example: "W0001_ENRICHMENT_UNAVAILABLE_TYPE"
-        enrichment_type:
-          type: ["string", "null"]
-          description: Enrichment type if applicable
-          example: "email"
-        reason:
-          type: string
-          description: Human-readable reason
-          example: "Profile does not have email data"
-      description: Warning detail for enrichment response
-    
-    MoreProfilesResultsMetadata:
-      type: object
-      properties:
-        total_possible_profiles_found:
-          type: integer
-          minimum: 0
-          description: Total possible profiles matches found
-          example: 1500
-        total_profiles_scanned:
-          type: integer
-          minimum: 0
-          description: Total profiles our AI has scanned
-          example: 100
-        total_relevant_profiles_found:
-          type: integer
-          minimum: 0
-          description: Total accumulated relevant profiles found
-          example: 20
-        total_new_relevant_profiles_found:
-          type: integer
-          minimum: 0
-          description: New relevant profiles found in this execution
-          example: 5
-      description: Metadata results for POST /searches/{search_id}/more-profiles
-    
-    MoreProfilesMetadata:
-      type: object
-      properties:
-        results:
-          $ref: '#/components/schemas/MoreProfilesResultsMetadata'
-      description: Metadata for POST /searches/{search_id}/more-profiles
     
     # =====================================================================
     # STANDARD API RESPONSE ENVELOPE
@@ -725,6 +459,9 @@ components:
     
     ErrorResponse:
       type: object
+      required:
+        - code
+        - message
       properties:
         code:
           type: string
@@ -753,6 +490,10 @@ components:
     
     APIResponse:
       type: object
+      required:
+        - success
+        - request_id
+        - processing_time_ms
       properties:
         success:
           type: boolean
@@ -771,7 +512,6 @@ components:
           oneOf:
             - $ref: '#/components/schemas/SearchProfilesMetadata'
             - $ref: '#/components/schemas/EnrichmentMetadataAPI'
-            - $ref: '#/components/schemas/MoreProfilesMetadata'
             - type: object
             - type: "null"
           description: Endpoint-specific metadata
@@ -848,10 +588,11 @@ components:
                     type: boolean
                   data:
                     type: "null"
-                  metadata:
-                    type: "null"
                   error:
                     type: object
+                    required:
+                      - code
+                      - message
                     properties:
                       code:
                         type: string
@@ -898,8 +639,6 @@ components:
                     type: boolean
                   data:
                     type: "null"
-                  metadata:
-                    type: "null"
                   error:
                     type: object
                     properties:
@@ -939,8 +678,6 @@ components:
                     type: boolean
                   data:
                     type: "null"
-                  metadata:
-                    type: "null"
                   error:
                     type: object
                     properties:
@@ -979,8 +716,6 @@ components:
                   success:
                     type: boolean
                   data:
-                    type: "null"
-                  metadata:
                     type: "null"
                   error:
                     type: object
@@ -1029,8 +764,6 @@ components:
                     type: boolean
                   data:
                     type: "null"
-                  metadata:
-                    type: "null"
                   error:
                     type: object
                     properties:
@@ -1069,8 +802,6 @@ components:
                   success:
                     type: boolean
                   data:
-                    type: "null"
-                  metadata:
                     type: "null"
                   error:
                     type: object
@@ -1111,8 +842,6 @@ components:
                     type: boolean
                   data:
                     type: "null"
-                  metadata:
-                    type: "null"
                   error:
                     type: object
                     properties:
@@ -1151,8 +880,6 @@ components:
                   success:
                     type: boolean
                   data:
-                    type: "null"
-                  metadata:
                     type: "null"
                   error:
                     type: object
@@ -1197,7 +924,7 @@ paths:
     post:
       summary: Query
       description: |
-        Execute a natural language search query to find professional profiles that match your criteria. This endpoint processes your query using AI to understand requirements, searches through professional databases, and returns relevant profiles with relevancy scores. The search runs asynchronously, so you'll receive a `job_id` immediately. Use the `GET /jobs/{job_id}/stream` endpoint to track progress in real-time.
+        Execute a natural language search query to find professional profiles that match your criteria. This endpoint processes your query using AI to understand requirements, searches through professional databases, and returns relevant profiles with relevancy scores. The search runs asynchronously, so you'll receive a `job_id` immediately to track progress via Server-Sent Events (SSE).
       operationId: executeSearchQuery
       tags:
         - Searches
@@ -1216,14 +943,17 @@ paths:
                 summary: Basic search query
                 value:
                   query: "Find partnership managers at Google in UK"
+                  profiles_requested: 20
               "Specific requirements":
                 summary: Search with specific requirements
                 value:
-                  query: "Find partnership managers at Google in UK"
+                  query: "Find a fractional sales person (like a fractional head of sales, sales advisor, or part-time sales consultant etc) that has experience working in software development agencies or marketing/creative/branding/digital agencies. I don't want a very senior person with 10+ years of experience."
+                  profiles_requested: 50
               "Search by linkedin url":
                 summary: Search by LinkedIn URL
                 value:
-                  query: "Find partnership managers at Google in UK"
+                  query: "Find this person: https://www.linkedin.com/in/chiu-wing-chris-cheung-a5773795/"
+                  profiles_requested: 1
       responses:
         '201':
           description: Query accepted and processing started
@@ -1238,6 +968,10 @@ paths:
             application/json:
               schema:
                 type: object
+                required:
+                  - success
+                  - request_id
+                  - processing_time_ms
                 properties:
                   success:
                     type: boolean
@@ -1258,10 +992,10 @@ paths:
                   job_id: "550e8400-e29b-41d4-a716-446655440000"
                   query: "Find partnership managers at Google in UK"
                   user_id: "123e4567-e89b-12d3-a456-426614174000"
-                  api_key_id: "789e4567-e89b-12d3-a456-426614174000"
+                  api_key_id: "abc12345-e89b-12d3-a456-426614174000"
                 metadata: null
                 error: null
-                request_id: "abc12345-e89b-12d3-a456-426614174000"
+                request_id: "def67890-e89b-12d3-a456-426614174000"
                 processing_time_ms: 85
         '400':
           $ref: '#/components/responses/400_BadRequest'
@@ -1278,10 +1012,6 @@ paths:
                     properties:
                       success:
                         type: boolean
-                      data:
-                        type: "null"
-                      metadata:
-                        type: "null"
                       error:
                         type: object
                         properties:
@@ -1325,8 +1055,6 @@ paths:
       summary: Retrieve Profiles
       description: |
         Retrieve all profiles found by a completed search, including relevancy scores and any enrichment data you've added. Profiles are returned in relevancy order (highest to lowest), making it easy to identify the best matches. The response includes search statistics showing how many profiles were found, scanned, and matched your criteria.
-        
-        **Getting the search_id**: After executing a query via `POST /searches/query`, stream the job progress using `GET /jobs/{job_id}/stream`. The `search_id` is included in the `metadata` field of the final event (when `is_final: true` and `status: "COMPLETED"`).
       operationId: getSearchProfiles
       tags:
         - Searches
@@ -1357,6 +1085,10 @@ paths:
             application/json:
               schema:
                 type: object
+                required:
+                  - success
+                  - request_id
+                  - processing_time_ms
                 properties:
                   success:
                     type: boolean
@@ -1374,15 +1106,19 @@ paths:
               example:
                 success: true
                 data:
-                  summarised_query: "Find partnership managers at Google in UK"
+                  summarised_query: "Software engineers in San Francisco with Python experience"
                   profiles:
-                    - {}
-                    # Profile objects contain assembled data (see Profile Schema documentation for complete structure)
+                    - people_id: "123e4567-e89b-12d3-a456-426614174000"
+                      full_name: "John Doe"
+                      headline: "Senior Software Engineer at Tech Corp"
+                      current_company: "Tech Corp"
+                      current_position: "Senior Software Engineer"
+                      location: "San Francisco, CA"
+                      relevancy_score: 92
+                      relevancy_summary: "Strong Python experience with 7 years in San Francisco"
                 metadata:
                   results:
-                    total_possible_profiles_found: 1500
-                    total_profiles_scanned: 100
-                    total_relevant_profiles_found: 20
+                    total_profiles: 20
                 error: null
                 request_id: "abc12345-e89b-12d3-a456-426614174000"
                 processing_time_ms: 1250
@@ -1401,10 +1137,6 @@ paths:
                     properties:
                       success:
                         type: boolean
-                      data:
-                        type: "null"
-                      metadata:
-                        type: "null"
                       error:
                         type: object
                         properties:
@@ -1429,11 +1161,7 @@ paths:
     post:
       summary: More Profiles
       description: |
-        Fetch additional profiles for an existing search when you need more results. This endpoint uses the same search context and criteria as your original search to find additional relevant profiles. The process runs asynchronously, so you'll receive a `job_id` immediately. Use the `GET /jobs/{job_id}/stream` endpoint to track progress in real-time. Once complete, the new profiles are automatically merged with your existing results. You can use the `GET /searches/{search_id}/profiles` endpoint to retrieve the updated search results.
-        
-        **Request Profile Count**: You can request between 1-200 additional profiles per call. Adding 50 profiles typically takes 1-2 minutes, depending on the complexity of the search. If you want faster response times, we recommend making iterative requests with a lower profile count (e.g., 20 profiles per request) to receive more frequent search updates.
-        
-        The requested profile count is treated as a target, not a guarantee. The endpoint may return more profiles than requested if it finds additional relevant matches, or fewer profiles than requested if it exhausts the effort budget assigned to the AI for the search.
+        Fetch additional profiles for an existing search when you need more results. This endpoint uses the same search context and criteria as your original search to find additional relevant profiles. The process runs asynchronously, and once complete, the new profiles are automatically merged with your existing results. You can request between 1-200 additional profiles per call.
       operationId: fetchMoreProfiles
       tags:
         - Searches
@@ -1479,13 +1207,17 @@ paths:
             application/json:
               schema:
                 type: object
+                required:
+                  - success
+                  - request_id
+                  - processing_time_ms
                 properties:
                   success:
                     type: boolean
                   data:
                     $ref: '#/components/schemas/MoreProfilesJobResponse'
                   metadata:
-                    $ref: '#/components/schemas/MoreProfilesMetadata'
+                    type: "null"
                   error:
                     type: "null"
                   request_id:
@@ -1499,15 +1231,10 @@ paths:
                   job_id: "550e8400-e29b-41d4-a716-446655440000"
                   search_id: "d7b7e1e3-2136-4eb4-872a-8c6dd265d518"
                   created_at: "2025-12-23T10:30:00.000Z"
+                  user_id: "123e4567-e89b-12d3-a456-426614174000"
                   status: "IN_PROGRESS"
                   profiles_requested: 20
-                  user_id: "123e4567-e89b-12d3-a456-426614174000"
-                metadata:
-                  results:
-                    total_possible_profiles_found: 1500
-                    total_profiles_scanned: 100
-                    total_relevant_profiles_found: 20
-                    total_new_relevant_profiles_found: 0
+                metadata: null
                 error: null
                 request_id: "abc12345-e89b-12d3-a456-426614174000"
                 processing_time_ms: 75
@@ -1528,10 +1255,6 @@ paths:
                     properties:
                       success:
                         type: boolean
-                      data:
-                        type: "null"
-                      metadata:
-                        type: "null"
                       error:
                         type: object
                         properties:
@@ -1602,6 +1325,10 @@ paths:
             application/json:
               schema:
                 type: object
+                required:
+                  - success
+                  - request_id
+                  - processing_time_ms
                 properties:
                   success:
                     type: boolean
@@ -1621,9 +1348,9 @@ paths:
                 data:
                   profiles:
                     - people_id: "123e4567-e89b-12d3-a456-426614174000"
-                      contact_data:
-                        contact_emails:
-                          - email: "john.doe@example.com"
+                      email:
+                        - email: "john.doe@example.com"
+                          priority: 1
                 metadata:
                   results:
                     total_profiles_requested_enrichment: 2
@@ -1653,10 +1380,6 @@ paths:
                     properties:
                       success:
                         type: boolean
-                      data:
-                        type: "null"
-                      metadata:
-                        type: "null"
                       error:
                         type: object
                         properties:
@@ -1698,6 +1421,10 @@ paths:
       summary: Stream Job Updates
       description: |
         Stream real-time progress updates for asynchronous operations like searches and profile fetching using Server-Sent Events (SSE). This endpoint provides live updates on job status, current processing stage, and completion status. You'll receive events as the job progresses through different stages, with a final event when the job completes or encounters an error. The stream automatically closes after the final event.
+
+        **Important: Retrieving profiles during search**
+
+        During the "Aggregate Search Results" stage, you'll receive events containing `search_id` in the metadata whenever a new batch of profiles is matched. Each time you receive this event, you can call `GET /searches/{search_id}/profiles` to retrieve the latest profiles found so far. This allows you to display results progressively to users rather than waiting for the entire search to complete.
       operationId: streamJobUpdates
       tags:
         - Jobs
@@ -1724,112 +1451,38 @@ paths:
                 description: |
                   Server-Sent Events stream with job updates.
                   
-                  **SSE Event Format:**
+                  Each event contains a JSON payload with job progress information.
+                  Events are sent as they occur during job execution.
                   
-                  Each event follows the SSE specification format:
-                  
-                  ```
-                  id: <event_id>
-                  event: job_update
-                  data: <JSON object>
-                  ```
-                  
-                  **Event Fields:**
-                  - `id`: Event identifier (UUID) - unique ID for this event
-                  - `event`: Event type (always "job_update")
-                  - `data`: JSON payload containing job progress information
-                  
-                  **Data Payload Structure:**
-                  
-                  The `data` field contains a JSON object with the following structure (see SSEJobUpdateEvent schema for complete details):
-                  
-                  - `event_id` (string, UUID): Unique event identifier
-                  - `job_id` (string, UUID): Job identifier this event belongs to
-                  - `timestamp` (string, ISO-8601): Event timestamp in UTC
-                  - `stage` (string): Current processing stage name (e.g., "Extract Requirements", "Complete Processing")
-                  - `message` (string): Human-readable progress message
-                  - `status` (string, enum): Job status - `IN_PROGRESS`, `COMPLETED`, or `ERROR`
-                  - `is_final` (boolean): Whether this is the final event (stream closes after final event)
-                  - `metadata` (object, nullable): Metadata included in events. For most progress events, this field is `null`. The final event (when `is_final: true` and `status: "COMPLETED"`) includes `search_id` in metadata, and optionally `finish_reason` and `finish_reason_message` if the search completed with specific conditions.
-                  - `error_details` (object, nullable): Error information if status is `ERROR` (contains `code` and `message`)
-                  
-                  **Obtaining the search_id:**
-                  
-                  After executing a query via `POST /searches/query`, stream the job progress using this endpoint. The `search_id` is included in the `metadata` field of the final event when the job completes successfully. Specifically, look for the event where `is_final: true` and `status: "COMPLETED"`. The `metadata` object will contain a `search_id` field (UUID) that you can use to retrieve search results via the `GET /searches/{search_id}/profiles` endpoint.
-                  
-                  **Stream Behavior:**
-                  
-                  Events are sent as they occur during job execution. The stream closes automatically after the final event (when `is_final: true`).
-                  
-                  **Job Completion Scenarios:**
-                  
-                  A job can finish in one of the following ways:
-                  
-                  1. **Successful Completion**: The job completes successfully with `status: "COMPLETED"` and `is_final: true`. The `metadata` field contains `search_id` (UUID) that you can use to retrieve results. This is the standard success path.
-                  
-                  2. **Completion with Finish Reasons**: The job completes with `status: "COMPLETED"` but includes a `finish_reason` in `metadata` indicating why the search completed in a particular state. These are valid completion states, not errors:
-                     - `DOMAIN_VIOLATION`: Your query is not about people search. Reframe it to focus on finding specific people.
-                     - `UNCLEAR_REQUIREMENTS`: Your query needs more specific details (location, industry, role, etc.) to find the right people.
-                     - `PROFILES_EXHAUSTED`: All available profiles for this search have been fetched. No additional profiles are available.
-                     - `NO_RELEVANT_PROFILES_FOUND`: No relevant profiles were found matching your search criteria. Try adjusting your requirements.
-                  
-                  3. **Error**: The job fails with `status: "ERROR"` and `is_final: true`. The `error_details` field contains a `code` (error code) and `message` (user-friendly error message) explaining what went wrong. This indicates a system error or service unavailability, not a query issue.
+                  The stream closes automatically after the final event (is_final: true).
               examples:
                 "Progress event":
                   summary: Progress update event
                   value: |
                     id: e1234567-e89b-12d3-a456-426614174000
                     event: job_update
-                    data: {
-                      "event_id": "e1234567-e89b-12d3-a456-426614174000",
-                      "job_id": "550e8400-e29b-41d4-a716-446655440000",
-                      "timestamp": "2025-12-23T10:30:05.000Z",
-                      "stage": "Extract Requirements",
-                      "message": "Extracting requirements from your query",
-                      "status": "IN_PROGRESS",
-                      "is_final": false,
-                      "metadata": null,
-                      "error_details": null
-                    }
-                    
+                    data: {"event_id":"e1234567-e89b-12d3-a456-426614174000","job_id":"550e8400-e29b-41d4-a716-446655440000","timestamp":"2025-12-23T10:30:05.000Z","stage":"Extract Requirements","message":"Extracting requirements from your query","status":"IN_PROGRESS","is_final":false,"metadata":null,"error_details":null}
+
+                "Aggregate results (new profiles available)":
+                  summary: New batch of profiles matched - use search_id to retrieve
+                  value: |
+                    id: e1234567-e89b-12d3-a456-426614174500
+                    event: job_update
+                    data: {"event_id":"e1234567-e89b-12d3-a456-426614174500","job_id":"550e8400-e29b-41d4-a716-446655440000","timestamp":"2025-12-23T10:30:25.000Z","stage":"Aggregate Search Results","message":"Search results aggregated successfully","status":"COMPLETED","is_final":false,"metadata":{"search_id":"d7b7e1e3-2136-4eb4-872a-8c6dd265d518","new_relevant_profiles":15,"total_relevant_profiles":15},"error_details":null}
+
                 "Final event":
                   summary: Final completion event
                   value: |
                     id: e1234567-e89b-12d3-a456-426614174999
                     event: job_update
-                    data: {
-                      "event_id": "e1234567-e89b-12d3-a456-426614174999",
-                      "job_id": "550e8400-e29b-41d4-a716-446655440000",
-                      "timestamp": "2025-12-23T10:30:45.000Z",
-                      "stage": "Complete Processing",
-                      "message": "Query processing completed",
-                      "status": "COMPLETED",
-                      "is_final": true,
-                      "metadata": {
-                        "search_id": "d7b7e1e3-2136-4eb4-872a-8c6dd265d518"
-                      },
-                      "error_details": null
-                    }
+                    data: {"event_id":"e1234567-e89b-12d3-a456-426614174999","job_id":"550e8400-e29b-41d4-a716-446655440000","timestamp":"2025-12-23T10:30:45.000Z","stage":"Complete Processing","message":"Query processing completed","status":"COMPLETED","is_final":true,"metadata":{"search_id":"d7b7e1e3-2136-4eb4-872a-8c6dd265d518"},"error_details":null}
                     
                 "Error event":
                   summary: Final error event
                   value: |
                     id: e1234567-e89b-12d3-a456-426614175000
                     event: job_update
-                    data: {
-                      "event_id": "e1234567-e89b-12d3-a456-426614175000",
-                      "job_id": "550e8400-e29b-41d4-a716-446655440000",
-                      "timestamp": "2025-12-23T10:30:50.000Z",
-                      "stage": "Error",
-                      "message": "A service is temporarily unavailable. Please try again later.",
-                      "status": "ERROR",
-                      "is_final": true,
-                      "metadata": null,
-                      "error_details": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "A service is temporarily unavailable. Please try again later."
-                      }
-                    }
+                    data: {"event_id":"e1234567-e89b-12d3-a456-426614175000","job_id":"550e8400-e29b-41d4-a716-446655440000","timestamp":"2025-12-23T10:30:50.000Z","stage":"Error","message":"A service is temporarily unavailable. Please try again later.","status":"ERROR","is_final":true,"metadata":null,"error_details":{"code":"SERVICE_UNAVAILABLE","message":"A service is temporarily unavailable. Please try again later."}}
         '401':
           $ref: '#/components/responses/401_Unauthorized'
         '403':

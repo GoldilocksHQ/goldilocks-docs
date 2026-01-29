@@ -25,44 +25,30 @@
     }
   },
   "navigation": {
-    "tabs": [
+    "groups": [
       {
-        "tab": "API reference",
-        "groups": [
+        "group": "Getting Started",
+        "pages": [
+          "api-reference/introduction",
+          "api-reference/quickstart"
+        ]
+      },
+      {
+        "group": "Endpoints",
+        "pages": [
           {
-            "group": "Getting Started",
+            "group": "Searches",
             "pages": [
-              "api-reference/introduction",
-              "api-reference/quickstart"
+              "api-reference/searches/query",
+              "api-reference/searches/profiles",
+              "api-reference/searches/more-profiles"
             ]
           },
-          {
-            "group": "Endpoints",
-            "pages": [
-              {
-                "group": "Searches",
-                "pages": [
-                  "api-reference/searches/query",
-                  "api-reference/searches/profiles",
-                  "api-reference/searches/more-profiles"
-                ]
-              },
-              "api-reference/enrichment",
-              "api-reference/jobs"
-            ]
-          },
-          {
-            "group": "Schema",
-            "pages": [
-              "api-reference/schema/profile"
-            ]
-          }
+          "api-reference/enrichment",
+          "api-reference/jobs"
         ]
       }
-    ],
-    "global": {
-      "anchors": []
-    }
+    ]
   },
   "logo": {
     "light": "/logo/goldilocks_logo.png",
@@ -73,8 +59,7 @@
     "links": [
       {
         "label": "Support",
-        "href": "mailto:chris@goldilocksai.co.uk",
-        "description": "Send us an email at chris@goldilocksai.co.uk"
+        "href": "mailto:chris@goldilocksai.co.uk"
       }
     ],
     "primary": {
